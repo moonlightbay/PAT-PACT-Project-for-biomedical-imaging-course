@@ -93,3 +93,5 @@ htmlcov/
 # Environment variables
 .env
 .env.local
+
+utils/k-wave-toolbox-version-1.4/k-Wave/helpfiles
