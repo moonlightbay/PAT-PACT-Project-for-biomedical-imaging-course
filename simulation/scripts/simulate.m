@@ -11,13 +11,40 @@
 clear; clc; close all;
 % 设置项目根目录为当前文件夹
 addpath('..\..\utils\k-wave-toolbox-version-1.4\k-Wave');  % 请将此路径替换为 k-Wave 工具箱的实际安装路径
+
+% =========================================================================
+% 批量仿真参数设置区域
+% =========================================================================
+
+% 输入图像文件夹路径
+input_image_dir = '..\..\data\raw\output_MRA';
+
+% 输入图像文件前缀
+input_image_prefix = 'vessel'; % 请根据实际情况修改
+
+% 索引范围 (包含起始和结束索引)
+start_idx = 1;
+end_idx = 10;
+
+% 标签文件（初始光声压力分布）前缀
+ground_truth_prefix = 'ground_truth';
+
+% 仿真结果文件前缀
+simulation_prefix = 'sim_data';
+
+% PA数据输出文件夹路径
+pa_data_output_dir = '..\..\..\reconstruction\pa_data';
+
+% 真实标签输出文件夹路径
+ground_truth_output_dir = '..\..\..\reconstruction\ground_truth';
+
+% 创建输出文件夹
+if ~exist(pa_data_output_dir, 'dir'), mkdir(pa_data_output_dir); end
+if ~exist(ground_truth_output_dir, 'dir'), mkdir(ground_truth_output_dir); end
+
 % -------------------------------------------------------------------------
 % 1. 仿真环境与网格设置
 % -------------------------------------------------------------------------
-
-% 数据保存路径
-save_dir_data = 'pa_data';
-if ~exist(save_dir_data, 'dir'), mkdir(save_dir_data); end
 
 
 % 定义计算网格 (256 x 256)
@@ -57,88 +84,91 @@ bandwidth = 70;             % 带宽 [%]
 sensor.frequency_response = [center_freq, bandwidth];
 
 % -------------------------------------------------------------------------
-% 3. 加载或生成初始声压分布 (Source)
+% 3. 批量处理循环
 % -------------------------------------------------------------------------
 
-% 尝试加载图像，如果不存在则生成血管仿体
-% 请将您的血管图像放置在 data/raw/ 目录下或修改此路径
-% img_path = fullfile('..', '..', 'data', 'raw', 'vessel_mask.png'); 
-img_path = '..\..\data\\raw\\output_MRA\\10001-TOF_ADAM_mip.png';
-if exist(img_path, 'file')
+fprintf('开始批量仿真，处理图像索引范围: %d 到 %d\n', start_idx, end_idx);
+
+for idx = start_idx:end_idx
+    % 构建当前图像文件名和路径
+    % 假设文件名格式为: 前缀_0001.png
+    image_filename = sprintf('%s_%04d.png', input_image_prefix, idx);
+    img_path = fullfile(input_image_dir, image_filename);
+    
+    if ~exist(img_path, 'file')
+        warning('图像文件不存在: %s', img_path);
+        continue;
+    end
+    
     % 加载图像并调整大小为 Nx * Ny
     p0_image = loadImage(img_path); 
     if size(p0_image, 1) ~= Nx || size(p0_image, 2) ~= Ny
         p0_image = imresize(p0_image, [Nx, Ny]);
     end
-    % loadImage 已归一化并反向映射，这里翻转回“血管亮、背景暗”
+    % loadImage 已归一化并反向映射，这里翻转回"血管亮、背景暗"
     p0 = 1 - p0_image;
-    disp(['已加载图像: ', img_path]);
-else
-    % 生成血管仿体 (Vessel Phantom)
-    disp('未找到指定图像，生成默认血管仿体...');
-    % 使用 makeDisc 生成几个圆形代表血管截面
-    p0 = zeros(Nx, Ny);
-    p0 = p0 + makeDisc(Nx, Ny, Nx/2, Ny/2, 10);          % 中心大血管
-    p0 = p0 + makeDisc(Nx, Ny, Nx/2+30, Ny/2-20, 6);     % 旁侧小血管
-    p0 = p0 + makeDisc(Nx, Ny, Nx/2-20, Ny/2+40, 4);     % 旁侧微血管
+    fprintf('已加载图像: %s\n', img_path);
     
-    % 平滑处理以避免数值伪影 (参考示例使用 smooth)
-    % 注意：如果遇到 MATLAB 自带 smooth 函数冲突，可改用 gaussianFilter
-    if exist('smooth', 'file')
-        p0 = smooth(p0, true); 
-    else
-        p0 = gaussianFilter(p0, [Nx, Ny], 1, true);
+    % 保存真实标签（初始光声压力分布）
+    ground_truth_filename = sprintf('%s_%04d.mat', ground_truth_prefix, idx);
+    ground_truth_path = fullfile(ground_truth_output_dir, ground_truth_filename);
+    save(ground_truth_path, 'p0');
+    
+    % 设置源
+    source.p0 = p0;
+
+    % -----------------------------------------------------------------
+    % 4. 执行 k-Wave 仿真
+    % -----------------------------------------------------------------
+
+    fprintf('开始仿真第 %d 个图像...\n', idx);
+
+    % 设置输入参数
+    % PlotSim: 是否实时显示波场 (批量处理时关闭)
+    % RecordMovie: 是否录制波场传播视频 (批量处理时关闭)
+    % PMLInside: false 表示 PML 层在网格外部，确保 256x256 区域完全有效 (参考示例)
+    input_args = {'PlotSim', false, 'RecordMovie', false, 'PMLInside', false};
+
+    % 运行 2D 前向仿真
+    sensor_data = kspaceFirstOrder2D(kgrid, medium, source, sensor, input_args{:});
+
+    fprintf('第 %d 个图像仿真完成。\n', idx);
+
+    % -----------------------------------------------------------------
+    % 5. 保存数据
+    % -----------------------------------------------------------------
+
+    % 保存仿真数据 (模拟 RF 信号)
+    simulation_filename = sprintf('%s_%04d.mat', simulation_prefix, idx);
+    simulation_path = fullfile(pa_data_output_dir, simulation_filename);
+    save(simulation_path, 'sensor_data');
+    fprintf('仿真数据已保存至: %s\n', simulation_path);
+
+    % 可选：显示当前处理结果 (每5个图像显示一次)
+    if mod(idx, 5) == 0
+        figure('Name', sprintf('PACT Simulation Results - Image %d', idx), 'Color', 'w', 'Position', [100, 100, 1000, 400]);
+
+        % 显示初始声压分布
+        subplot(1, 2, 1);
+        imagesc(kgrid.y_vec * 1e3, kgrid.x_vec * 1e3, source.p0);
+        axis image;
+        colormap(gray);
+        colorbar;
+        xlabel('y [mm]');
+        ylabel('x [mm]');
+        title('初始声压分布 (Source)');
+
+        % 显示传感器接收到的信号
+        subplot(1, 2, 2);
+        imagesc(1:num_sensor_points, kgrid.t_array * 1e6, sensor_data);
+        xlabel('传感器阵元索引');
+        ylabel('时间 [\mus]');
+        title('接收到的光声信号 (Sensor Data)');
+        colorbar;
     end
-end
 
-source.p0 = p0;
+end  % 结束批量处理循环
 
-% -------------------------------------------------------------------------
-% 4. 执行 k-Wave 仿真
-% -------------------------------------------------------------------------
-
-disp('开始仿真...');
-
-% 设置输入参数
-% PlotSim: 是否实时显示波场
-% RecordMovie: 是否录制波场传播视频
-% PMLInside: false 表示 PML 层在网格外部，确保 256x256 区域完全有效 (参考示例)
-input_args = {'PlotSim', true, 'RecordMovie', false, 'MovieName', 'pact_sim', 'PMLInside', false};
-
-% 运行 2D 前向仿真
-sensor_data = kspaceFirstOrder2D(kgrid, medium, source, sensor, input_args{:});
-
-disp('仿真完成。');
-
-% -------------------------------------------------------------------------
-% 5. 保存数据与结果展示
-% -------------------------------------------------------------------------
-
-% 保存仿真数据 (模拟 RF 信号)
-% 文件名包含时间戳或索引，这里使用固定名称演示
-save_filename_data = fullfile(save_dir_data, 'sim_data_circular.mat');
-save(save_filename_data, 'sensor_data', 'kgrid', 'medium', 'sensor');
-disp(['仿真数据已保存至: ', save_filename_data]);
-
-% 可视化结果
-figure('Name', 'PACT Simulation Results', 'Color', 'w', 'Position', [100, 100, 1000, 400]);
-
-% 显示初始声压分布
-subplot(1, 2, 1);
-imagesc(kgrid.y_vec * 1e3, kgrid.x_vec * 1e3, source.p0);
-axis image;
-colormap(gray);
-colorbar;
-xlabel('y [mm]');
-ylabel('x [mm]');
-title('初始声压分布 (Source)');
-
-% 显示传感器接收到的信号
-subplot(1, 2, 2);
-imagesc(1:num_sensor_points, kgrid.t_array * 1e6, sensor_data);
-xlabel('传感器阵元索引');
-ylabel('时间 [\mus]');
-title('接收到的光声信号 (Sensor Data)');
-colorbar;
+fprintf('批量仿真完成！\n');
 
 
