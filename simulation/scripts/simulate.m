@@ -9,34 +9,38 @@
 % =========================================================================
 
 clear; clc; close all;
-% 设置项目根目录为当前文件夹
-addpath('..\..\utils\k-wave-toolbox-version-1.4\k-Wave');  % 请将此路径替换为 k-Wave 工具箱的实际安装路径
+
+% 导入 k-Wave 工具箱路径
+addpath(fullfile('utils', 'k-wave-toolbox-version-1.4', 'k-Wave'));  % 请将此路径替换为 k-Wave 工具箱的实际安装路径
 
 % =========================================================================
 % 批量仿真参数设置区域
 % =========================================================================
 
-% 输入图像文件夹路径
-input_image_dir = '..\..\data\raw\output_MRA';
+% 项目根目录(当前工作目录的上两级)
+root_dir = fileparts(fileparts(pwd));
 
+% 输入图像文件夹路径
+input_image_dir = fullfile(root_dir, 'data',  'mask'); % 请根据实际情况修改
+    
 % 输入图像文件前缀
-input_image_prefix = 'vessel'; % 请根据实际情况修改
+input_image_prefix = 'Mask'; % 请根据实际情况修改
 
 % 索引范围 (包含起始和结束索引)
 start_idx = 1;
-end_idx = 10;
+end_idx = 2;
 
 % 标签文件（初始光声压力分布）前缀
 ground_truth_prefix = 'ground_truth';
 
 % 仿真结果文件前缀
-simulation_prefix = 'sim_data';
+simulation_prefix = 'pa_data';
 
 % PA数据输出文件夹路径
-pa_data_output_dir = '..\..\..\reconstruction\pa_data';
+pa_data_output_dir = fullfile(root_dir, 'data', 'pa_data');
 
 % 真实标签输出文件夹路径
-ground_truth_output_dir = '..\..\..\reconstruction\ground_truth';
+ground_truth_output_dir = fullfile(root_dir, 'data', 'ground_truth');
 
 % 创建输出文件夹
 if ~exist(pa_data_output_dir, 'dir'), mkdir(pa_data_output_dir); end
@@ -141,31 +145,31 @@ for idx = start_idx:end_idx
     % 保存仿真数据 (模拟 RF 信号)
     simulation_filename = sprintf('%s_%04d.mat', simulation_prefix, idx);
     simulation_path = fullfile(pa_data_output_dir, simulation_filename);
-    save(simulation_path, 'sensor_data');
+    save(simulation_path, 'sensor_data', 'kgrid', 'medium', 'sensor');
     fprintf('仿真数据已保存至: %s\n', simulation_path);
 
-    % 可选：显示当前处理结果 (每5个图像显示一次)
-    if mod(idx, 5) == 0
-        figure('Name', sprintf('PACT Simulation Results - Image %d', idx), 'Color', 'w', 'Position', [100, 100, 1000, 400]);
+    % % 可选：显示当前处理结果 (每5个图像显示一次)
+    % if mod(idx, 5) == 0
+    %     figure('Name', sprintf('PACT Simulation Results - Image %d', idx), 'Color', 'w', 'Position', [100, 100, 1000, 400]);
 
-        % 显示初始声压分布
-        subplot(1, 2, 1);
-        imagesc(kgrid.y_vec * 1e3, kgrid.x_vec * 1e3, source.p0);
-        axis image;
-        colormap(gray);
-        colorbar;
-        xlabel('y [mm]');
-        ylabel('x [mm]');
-        title('初始声压分布 (Source)');
+    %     % 显示初始声压分布
+    %     subplot(1, 2, 1);
+    %     imagesc(kgrid.y_vec * 1e3, kgrid.x_vec * 1e3, source.p0);
+    %     axis image;
+    %     colormap(gray);
+    %     colorbar;
+    %     xlabel('y [mm]');
+    %     ylabel('x [mm]');
+    %     title('初始声压分布 (Source)');
 
-        % 显示传感器接收到的信号
-        subplot(1, 2, 2);
-        imagesc(1:num_sensor_points, kgrid.t_array * 1e6, sensor_data);
-        xlabel('传感器阵元索引');
-        ylabel('时间 [\mus]');
-        title('接收到的光声信号 (Sensor Data)');
-        colorbar;
-    end
+    %     % 显示传感器接收到的信号
+    %     subplot(1, 2, 2);
+    %     imagesc(1:num_sensor_points, kgrid.t_array * 1e6, sensor_data);
+    %     xlabel('传感器阵元索引');
+    %     ylabel('时间 [\mus]');
+    %     title('接收到的光声信号 (Sensor Data)');
+    %     colorbar;
+    % end
 
 end  % 结束批量处理循环
 
