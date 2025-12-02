@@ -104,8 +104,96 @@ class PicPreprocess:
             # 保存图像
             cv2.imwrite(output_path, img)
             
-            print(f"已重命名并保存: {output_path}")
+            # print(f"已重命名并保存: {output_path}")
+    
+    def mirror_and_rotate(self, fromDir:str, toDir:str) -> None:
+        """
+        对指定文件夹下的所有图片进行镜像和旋转操作，并保存到目标文件夹中。
+        - 参数:
+            - fromDir: 原始图片文件夹路径
+            - toDir: 处理后图片保存文件夹路径
+        """
+        os.makedirs(toDir, exist_ok=True)
+        
+        image_files = sorted(glob.glob(os.path.join(fromDir, "*.*")))
+        image_files = [f for f in image_files if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff'))]
+        
+        for img_path in image_files:
+            img = cv2.imread(img_path)
+            if img is None:
+                print(f"无法读取图片: {img_path}")
+                continue
+            # 一张图可以生成8张变换图（4个旋转角度，每个角度镜像一次）
+            base_name = os.path.splitext(os.path.basename(img_path))[0]
+            for angle in [0, 90, 180, 270]:
+                # 旋转
+                if angle == 0:
+                    rotated = img
+                else:
+                    rotated = cv2.rotate(img, {90: cv2.ROTATE_90_CLOCKWISE,
+                                               180: cv2.ROTATE_180,
+                                               270: cv2.ROTATE_90_COUNTERCLOCKWISE}[angle])
+                
+                # 保存旋转图
+                rotated_name = f"{base_name}_rot{angle}.png"
+                rotated_path = os.path.join(toDir, rotated_name)
+                cv2.imwrite(rotated_path, rotated)
+                
+                # 镜像
+                mirrored = cv2.flip(rotated, 1)  # 水平镜像
+                
+                # 保存镜像图
+                mirrored_name = f"{base_name}_rot{angle}_mirrored.png"
+                mirrored_path = os.path.join(toDir, mirrored_name)
+                cv2.imwrite(mirrored_path, mirrored)
+                
+                # print(f"已保存旋转图像和镜像图像: {rotated_path}, {mirrored_path}")
 
 
+    def show_pics_info(self, pic_path):
+        """
+        显示指定路径下图片的基本信息，包括尺寸和通道数。
+        - 参数:
+            - pic_path: 图片文件路径
+        """
+        img = cv2.imread(pic_path)
+        if img is None:
+            print(f"无法读取图片: {pic_path}")
+            return
+        
+        h, w = img.shape[:2]
+        channels = img.shape[2] if len(img.shape) == 3 else 1
+        
+        print(f"图片路径: {pic_path}")
+        print(f"尺寸: {w} x {h}")
+        print(f"通道数: {channels}")
 
 
+def main():
+    processor = PicPreprocess()
+    # binaried -> scaled -> augmented ->renamed-> mask&label -> pa_data&ground_truth
+    # # 缩放图片（基于PACT仿真配置优化）
+    # processor.pics_rescale(
+    #     fromDir="data/processed/binaried",
+    #     toDir="data/processed/scaled",
+    #     scaleFactor=0.781,  # 基于PACT传感器阵列配置计算得出
+    #     startIdx=0,
+    #     endIdx=315
+    # )
+
+    # # 旋转和镜像图片（数据增强）
+    # processor.mirror_and_rotate(
+    #     fromDir="data/processed/scaled",
+    #     toDir="data/processed/augmented"
+    # )
+    
+    # 示例：重命名图片
+    processor.pics_rename(
+        fromDir="data/processed/augmented",
+        toDir="data/processed/renamed",
+        prefix="Mask"
+    )
+
+
+if __name__ == "__main__":
+    main()

@@ -13,7 +13,7 @@ addpath('..\..\utils\k-wave-toolbox-version-1.4\k-Wave');
 % 1. 载入仿真数据
 % -------------------------------------------------------------------------
 
-data_path = fullfile('pa_data', 'sim_data_circular.mat');
+data_path = 'D:\works\PAT-PACT-Project-for-biomedical-imaging-course\data\pa_data\pa_data_0002.mat';
 if ~isfile(data_path)
 	error('未找到模拟数据文件：%s', data_path);
 end
