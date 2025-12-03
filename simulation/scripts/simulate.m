@@ -10,15 +10,15 @@
 
 clear; clc; close all;
 
-% 导入 k-Wave 工具箱路径
-addpath(fullfile('utils', 'k-wave-toolbox-version-1.4', 'k-Wave'));  % 请将此路径替换为 k-Wave 工具箱的实际安装路径
-
 % =========================================================================
 % 批量仿真参数设置区域
 % =========================================================================
 
 % 项目根目录(当前工作目录的上两级)
 root_dir = fileparts(fileparts(pwd));
+
+% 导入 k-Wave 工具箱路径
+addpath(fullfile(root_dir, 'utils', 'k-wave-toolbox-version-1.4', 'k-Wave'));  % 请将此路径替换为 k-Wave 工具箱的实际安装路径
 
 % 输入图像文件夹路径
 input_image_dir = fullfile(root_dir, 'data',  'mask'); % 请根据实际情况修改
@@ -27,8 +27,8 @@ input_image_dir = fullfile(root_dir, 'data',  'mask'); % 请根据实际情况�
 input_image_prefix = 'Mask'; % 请根据实际情况修改
 
 % 索引范围 (包含起始和结束索引)
-start_idx = 1;
-end_idx = 2;
+start_idx = 1397;
+end_idx = 2520;
 
 % 标签文件（初始光声压力分布）前缀
 ground_truth_prefix = 'ground_truth';
